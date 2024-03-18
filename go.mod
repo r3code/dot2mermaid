@@ -3,9 +3,8 @@ module dot2mermaidjs
 go 1.21.6
 
 require (
-	github.com/BruceNocentini13/go-mermaid v0.0.0-20240131145009-5c32f14f61f3
+	github.com/Heiko-san/mermaidgen v0.0.0-20240317141746-93f61cef3ac0
 	github.com/awalterschulze/gographviz v2.0.3+incompatible
-	github.com/emicklei/dot v1.6.1
 	github.com/stretchr/testify v1.9.0
 )
 

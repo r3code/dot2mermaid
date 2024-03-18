@@ -13,7 +13,7 @@ func TestConvertDOTToMermaid(t *testing.T) {
     digraph MessageArchitecture {
       messageClient
       messageQueue[shape=rarrow]
-      messageBackend[shape=rectanble]
+      messageBackend[shape=rectangle]
       messageDB[shape=cylinder]
       userService[shape=rectangle]
       userDB[shape=cylinder]
@@ -39,24 +39,24 @@ func TestConvertDOTToMermaid(t *testing.T) {
 	// messageQueue --> messageNotifier
 	// messageNotifier --> pushNotifications{{pushNotifications}}`
 
-	expectedMermaid := `graph TD;
-    n3("messageBackend");
-    n1("messageClient");
-    n4("messageDB");
-    n8("messageNotifier");
-    n2("messageQueue");
-    n7("pushNotifications");
-    n6("userDB");
-    n5("userService");
-    n3-->|" "|n5;
-    n3-->|" "|n4;
-    n1-->|"sendMessage"|n3;
-    n4-->|"&#34;change data capture&#34;"|n2;
-    n8-->|" "|n7;
-    n2-->|" "|n8;
-    n5-->|" "|n6;`
+	expectedMermaid := `graph TB
+    messageClient(["messageClient"])
+    messageQueue>"messageQueue"]
+    messageBackend["messageBackend"]
+    messageDB[("messageDB")]
+    userService["userService"]
+    userDB[("userDB")]
+    pushNotifications{{"pushNotifications"}}
+    messageNotifier["messageNotifier"]
+    messageClient -->|"sendMessage"| messageBackend
+    messageBackend --> userService
+    userService --> userDB
+    messageBackend --> messageDB
+    messageDB -->|"change data capture"| messageQueue
+    messageQueue --> messageNotifier
+    messageNotifier --> pushNotifications`
 
-	actualMermaid, err := СonvertDOTToMermaid(dotInput)
+	actualMermaid, err := ConvertDOTToMermaid(dotInput)
 
 	// Используем require для контроля ошибок, так как если есть ошибка, нет смысла продолжать тест
 	require.NoError(t, err)
@@ -71,5 +71,5 @@ func TestConvertDOTToMermaid(t *testing.T) {
 
 // normalizeWhitespace удаляет все пробелы и переносы строк из строки для упрощения сравнения.
 func normalizeWhitespace(input string) string {
-	return strings.Join(strings.Fields(input), " ")
+	return strings.Join(strings.Fields(input), "; ")
 }

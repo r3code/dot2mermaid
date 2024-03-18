@@ -1,79 +1,81 @@
 package main
 
 import (
-	"bufio"
-	"flag"
-	"fmt"
-	"os"
+	"strings"
 
-	"github.com/awalterschulze/gographviz"
-	"github.com/emicklei/dot"
+	"github.com/Heiko-san/mermaidgen/flowchart"
+	gographviz "github.com/awalterschulze/gographviz"
 )
 
-func СonvertDOTToMermaid(dotInput string) (string, error) {
-	gParsed, err := gographviz.Parse([]byte(dotInput))
+const (
+	NShapeCylinder         = `[("%s")]`
+	NShapeAsymmetric       = `>"%s"]`
+	NShapeStadium          = `(["%s"])`
+	NShapeHexagon          = `{{"%s"}}`
+	NShapeTrapezoid        = `[/"%s"\]`
+	NShapeTrapezoidAlt     = `[\"%s"/]`
+	NShapeParallelogram    = `[/"%s"/]`
+	NShapeParallelogramAlt = `[\"%s"\]`
+	NShapeDoubleCircle     = `((("%s")))`
+)
+
+// ConvertDOTToMermaid преобразует входную строку в формате DOT и возвращает её в формате MermaidJS.
+func ConvertDOTToMermaid(dotInput string) (string, error) {
+	parsedGraph, err := gographviz.Parse([]byte(dotInput))
 	if err != nil {
-		return "", fmt.Errorf("error parsing dot input: %w", err)
+		return "", err
 	}
 
 	graph := gographviz.NewGraph()
-	if err := gographviz.Analyse(gParsed, graph); err != nil {
-		return "", fmt.Errorf("error analysing graph: %w", err)
+	if err := gographviz.Analyse(parsedGraph, graph); err != nil {
+		return "", err
 	}
 
-	dGraph := dot.NewGraph(dot.Directed)
-	// Используем map для хранения узлов по ID, но без указателей
-	nodesMap := make(map[string]dot.Node)
+	fc := flowchart.NewFlowchart()
 
 	for _, node := range graph.Nodes.Nodes {
-		nodeID := node.Name
-		createdNode := dGraph.Node(nodeID)
-		nodesMap[nodeID] = createdNode // Прямое сохранение узла в мапе
+		nodeName := node.Name
+		newNode := fc.AddNode(nodeName)
+		// Применение стиля на основе атрибутов узла
+		shape := node.Attrs["shape"]
+		switch shape {
+		case "cylinder":
+			newNode.Shape = NShapeCylinder
+		case "rarrow":
+			newNode.Shape = NShapeAsymmetric // В MermaidJS нет точного эквивалента, это приблизительно
+		case "octagon":
+			newNode.Shape = NShapeHexagon // Используется ромб вместо октагона
+		case "rectangle":
+			newNode.Shape = flowchart.NShapeRect
+		default:
+			newNode.Shape = NShapeStadium // По умолчанию используем овал
+		}
+
+		// Применять текст метки к узлу таким образом:
+		if label, exists := node.Attrs["label"]; exists && label != "" {
+			newNode.AddLines(label)
+		}
 	}
 
 	for _, edge := range graph.Edges.Edges {
-		srcNode, srcExists := nodesMap[edge.Src]
-		dstNode, dstExists := nodesMap[edge.Dst]
-		if srcExists && dstExists { // Проверка, что узлы существуют в мапе
-			// Теперь используем узлы напрямую
-			label := edge.Attrs["label"]
-			formattedLabel := formatLabel(label)
-			dGraph.Edge(srcNode, dstNode).Attr("label", formattedLabel)
+		fromNode := fc.GetNode(edge.Src)
+		toNode := fc.GetNode(edge.Dst)
+		newEdge := fc.AddEdge(fromNode, toNode)
+
+		label := stripQuotes(edge.Attrs["label"])
+		if label != "" {
+			newEdge.AddLines(label)
 		}
 	}
 
-	mermaid := dot.MermaidGraph(dGraph, dot.MermaidTopToBottom)
-	return mermaid, nil
+	return fc.String(), nil
 }
 
-func formatLabel(label string) string {
-	// В MermaidJS пустые метки могут быть полностью опущены или должны содержать пробел.
-	if label == "" {
-		return " " // Использовать пробельный символ внутри метки для явного отображения пустой метки.
-	}
-	return fmt.Sprintf("%s", label) // Возвращаем метку, заключенную в кавычки, для не пустых меток.
-}
+func stripQuotes(s string) string {
+	// Удаляем кавычки в начале и конце строки, если они есть
+	s = strings.TrimPrefix(s, "\"")
+	s = strings.TrimSuffix(s, "\"")
 
-func main() {
-	stdinFlag := flag.Bool("i", false, "Read from STDIN")
-	flag.Parse()
-
-	var input string
-	if *stdinFlag {
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			input += scanner.Text() + "\n"
-		}
-	} else {
-		fmt.Println("Reading directly from a file is not supported in this version. Please pipe file content into the program.")
-		os.Exit(1)
-	}
-
-	mermaidOutput, err := СonvertDOTToMermaid(input)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to convert DOT to Mermaid: %v", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(mermaidOutput)
+	// Заменяем задвоенные кавычки на одинарные
+	return strings.ReplaceAll(s, "\"\"", "\"")
 }
