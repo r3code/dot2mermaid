@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bufio"
+	"flag"
+	"fmt"
+	"os"
 	"strings"
 
 	"github.com/Heiko-san/mermaidgen/flowchart"
@@ -78,4 +82,36 @@ func stripQuotes(s string) string {
 
 	// Заменяем задвоенные кавычки на одинарные
 	return strings.ReplaceAll(s, "\"\"", "\"")
+}
+
+func main() {
+	stdinFlag := flag.Bool("i", false, "read from STDIN")
+	flag.Parse()
+
+	var input string
+	if *stdinFlag {
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			input += scanner.Text() + "\n"
+		}
+	} else if len(flag.Args()) > 0 {
+		fileName := flag.Arg(0)
+		fileData, err := os.ReadFile(fileName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to read file: %v\n", err)
+			return
+		}
+		input = string(fileData)
+	} else {
+		fmt.Fprintf(os.Stderr, "No input provided. Use -i flag to read DOT from STDIN or pass dot filename as argument: me dot filename\n")
+		return
+	}
+
+	mermaidOutput, err := ConvertDOTToMermaid(input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "conversion failed: %v\n", err)
+		return
+	}
+
+	fmt.Println(mermaidOutput)
 }
